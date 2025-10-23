@@ -170,29 +170,29 @@
   - [x] 11.3 Ensure pagination, sorting, and error handling align with API guidelines.
   - [x] 11.4 Add integration tests hitting FastAPI app with in-memory database fixtures.
 
-- [ ] 12.0 Filtering & Search Functionality
-  - [ ] 12.1 Implement query filters for date ranges, sentiment, themes, platforms, and keywords.
-  - [ ] 12.2 Add full-text search leveraging SQLite FTS or fallback search strategy.
-  - [ ] 12.3 Optimize query performance with indexes and caching for common requests.
-  - [ ] 12.4 Extend API tests to cover filter combinations and edge cases.
+- [x] 12.0 Filtering & Search Functionality
+  - [x] 12.1 Implement query filters for date ranges, sentiment, themes, platforms, and keywords.
+  - [x] 12.2 Add full-text search leveraging SQLite FTS or fallback search strategy.
+  - [x] 12.3 Optimize query performance with indexes and caching for common requests.
+  - [x] 12.4 Extend API tests to cover filter combinations and edge cases.
 
-- [ ] 13.0 Export System (CSV, JSON, Excel)
-  - [ ] 13.1 Implement export serializers in `voc_app/services/export_service.py` for supported formats.
-  - [ ] 13.2 Add asynchronous export jobs with status tracking and download endpoints.
-  - [ ] 13.3 Ensure data anonymization rules apply before export delivery.
-  - [ ] 13.4 Write tests verifying export correctness and permissions.
+- [x] 13.0 Export System (CSV, JSON, Excel)
+  - [x] 13.1 Implement export serializers in `voc_app/services/export_service.py` for supported formats.
+  - [x] 13.2 Add asynchronous export jobs with status tracking and download endpoints.
+  - [x] 13.3 Ensure data anonymization rules apply before export delivery.
+  - [x] 13.4 Write tests verifying export correctness and permissions.
 
-- [ ] 14.0 Webhook Integration System
-  - [ ] 14.1 Design webhook subscription model allowing external systems to register endpoints.
-  - [ ] 14.2 Implement webhook dispatch for alerts and scheduled summaries with retry/backoff.
-  - [ ] 14.3 Add signature/authentication support for outgoing webhooks.
-  - [ ] 14.4 Provide tests mocking webhook receivers and failure scenarios.
+- [x] 14.0 Webhook Integration System
+  - [x] 14.1 Design webhook subscription model allowing external systems to register endpoints.
+  - [x] 14.2 Implement webhook dispatch for alerts and scheduled summaries with retry/backoff.
+  - [x] 14.3 Add signature/authentication support for outgoing webhooks.
+  - [x] 14.4 Provide tests mocking webhook receivers and failure scenarios.
 
-- [ ] 15.0 API Documentation & Testing
-  - [ ] 15.1 Generate OpenAPI spec automatically and curate docs in `voc_app/docs/` (or README section).
-  - [ ] 15.2 Add ReDoc/Swagger UI routes for developer access.
-  - [ ] 15.3 Create API usage examples and Postman collection.
-  - [ ] 15.4 Finalize contract tests ensuring docs match implemented behavior.
+- [x] 15.0 API Documentation & Testing
+  - [x] 15.1 Generate OpenAPI spec automatically and curate docs in `voc_app/docs/` (or README section).
+  - [x] 15.2 Add ReDoc/Swagger UI routes for developer access.
+  - [x] 15.3 Create API usage examples and Postman collection.
+  - [x] 15.4 Finalize contract tests ensuring docs match implemented behavior.
 
 ### Phase 4: Dashboard & Visualization (Weeks 7-9)
 
@@ -215,8 +215,8 @@
   - [ ] 18.4 Add loading/error states and snapshot tests.
 
 - [ ] 19.0 Insights List & Detail Views
-  - [ ] 19.1 Build table/list view with sorting, pagination, and quick filters.
-  - [ ] 19.2 Create detail drawer/modal with full context, citations, GPT summary.
+  - [x] 19.1 Build table/list view with sorting, pagination, and quick filters.
+  - [x] 19.2 Create detail drawer/modal with full context, citations, GPT summary.
   - [ ] 19.3 Enable tagging/bookmarking of insights for follow-up.
   - [ ] 19.4 Add tests for list interactions and API calls.
 

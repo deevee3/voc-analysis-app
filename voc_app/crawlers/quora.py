@@ -39,11 +39,14 @@ class QuoraCrawler(BaseCrawler):
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:
         schema = {
-            "question": "div.q-box span.q-text",
-            "author": "a.author_info span.author_name",
-            "answer_text": "div.q-text span.q-box",
-            "upvotes": "button[aria-label*='upvote'] span",
-            "timestamp": "a.answer_permalink span",
+            "baseSelector": "div[class*='Answer']",
+            "fields": [
+                {"name": "question", "selector": "div.q-box span.q-text", "type": "text"},
+                {"name": "author", "selector": "a.author_info span.author_name", "type": "text"},
+                {"name": "answer_text", "selector": "div.q-text span.q-box", "type": "text"},
+                {"name": "upvotes", "selector": "button[aria-label*='upvote'] span", "type": "text"},
+                {"name": "timestamp", "selector": "a.answer_permalink span", "type": "text"},
+            ],
         }
 
         extraction_strategy = JsonCssExtractionStrategy(schema)
@@ -59,8 +62,6 @@ class QuoraCrawler(BaseCrawler):
         """
 
         return {
-            "cache_mode": self.cache_mode,
-            "css_selector": "div[class*='Answer']",
             "extraction_strategy": extraction_strategy,
             "js_code": js_expand,
             "page_timeout": 60000,

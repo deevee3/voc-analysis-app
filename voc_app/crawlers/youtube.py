@@ -40,11 +40,14 @@ class YouTubeCrawler(BaseCrawler):
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:
         schema = {
-            "author": "a#author-text span",
-            "comment_text": "yt-formatted-string#content-text",
-            "timestamp": "a.yt-simple-endpoint span",
-            "likes": "span#vote-count-middle",
-            "reply_count": "yt-formatted-string.more-button",
+            "baseSelector": "ytd-comment-thread-renderer",
+            "fields": [
+                {"name": "author", "selector": "a#author-text span", "type": "text"},
+                {"name": "comment_text", "selector": "yt-formatted-string#content-text", "type": "text"},
+                {"name": "timestamp", "selector": "a.yt-simple-endpoint span", "type": "text"},
+                {"name": "likes", "selector": "span#vote-count-middle", "type": "text"},
+                {"name": "reply_count", "selector": "yt-formatted-string.more-button", "type": "text"},
+            ],
         }
 
         extraction_strategy = JsonCssExtractionStrategy(schema)
@@ -62,8 +65,6 @@ class YouTubeCrawler(BaseCrawler):
         """
 
         return {
-            "cache_mode": self.cache_mode,
-            "css_selector": "ytd-comment-thread-renderer",
             "extraction_strategy": extraction_strategy,
             "js_code": js_expand_comments,
             "wait_for": "ytd-comment-thread-renderer",

@@ -1,9 +1,10 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Database, Bell } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, FileText, Database, Bell } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Insights', href: '/insights', icon: MessageSquare },
+  { name: 'Feedback', href: '/feedback', icon: FileText },
   { name: 'Sources', href: '/sources', icon: Database },
   { name: 'Alerts', href: '/alerts', icon: Bell },
 ]

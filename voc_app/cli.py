@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -11,7 +11,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voc_app.config import get_settings
@@ -24,7 +24,16 @@ from voc_app.crawlers import (
     YouTubeCrawler,
 )
 from voc_app.database import _SessionFactory, init_db
-from voc_app.models import CrawlRun, DataSource
+from voc_app.models import (
+    AlertEvent,
+    AlertRule,
+    CrawlRun,
+    DataSource,
+    Feedback,
+    Insight,
+    InsightThemeLink,
+    Theme,
+)
 from voc_app.processors.cleaner import CleaningOptions
 from voc_app.processors.ingestion import run_ingestion_pipeline
 from voc_app.services.storage import StorageOptions
@@ -53,6 +62,169 @@ def init():
 
 async def _init_db():
     await init_db()
+
+
+@app.command()
+def seed_demo_data(
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Delete existing demo records before seeding",
+    ),
+):
+    """Seed the database with demo data for dashboards and insights."""
+
+    asyncio.run(_seed_demo_data(force))
+
+
+async def _seed_demo_data(force: bool) -> None:
+    console.print("[cyan]Seeding demo data...[/cyan]")
+
+    async with _SessionFactory() as session:
+        if force:
+            console.print("[yellow]Clearing existing demo records...[/yellow]")
+            await session.execute(delete(AlertEvent))
+            await session.execute(delete(AlertRule))
+            await session.execute(delete(InsightThemeLink))
+            await session.execute(delete(Theme))
+            await session.execute(delete(Insight))
+            await session.execute(delete(Feedback))
+            await session.execute(delete(CrawlRun))
+            await session.execute(delete(DataSource))
+            await session.commit()
+
+        existing_count = await session.execute(select(func.count(Insight.id)))
+        if existing_count.scalar_one() > 0:
+            console.print(
+                "[yellow]Insights already exist. Use --force to reseed demo data.[/yellow]"
+            )
+            return
+
+        now = datetime.now(timezone.utc)
+
+        data_sources = [
+            DataSource(
+                name="Reddit Brand Mentions",
+                platform="reddit",
+                is_active=True,
+                last_crawl_at=now - timedelta(hours=6),
+            ),
+            DataSource(
+                name="Support Tickets",
+                platform="zendesk",
+                is_active=True,
+                last_crawl_at=now - timedelta(hours=2),
+            ),
+        ]
+        session.add_all(data_sources)
+        await session.flush()
+
+        feedback_items = [
+            Feedback(
+                data_source_id=data_sources[0].id,
+                raw_content="Battery drains within two hours even on standby.",
+                clean_content="battery drains within two hours even on standby",
+                language="en",
+                posted_at=now - timedelta(days=2),
+                url="https://reddit.com/r/brandname/posts/123",
+                extra_metadata={"platform": "reddit", "subreddit": "brandname"},
+            ),
+            Feedback(
+                data_source_id=data_sources[0].id,
+                raw_content="Really happy with the new dashboard layout!",
+                clean_content="really happy with the new dashboard layout",
+                language="en",
+                posted_at=now - timedelta(days=1, hours=3),
+                url="https://reddit.com/r/brandname/posts/124",
+                extra_metadata={"platform": "reddit", "subreddit": "brandname"},
+            ),
+            Feedback(
+                data_source_id=data_sources[1].id,
+                raw_content="Order #4567 still hasn't shipped after two weeks.",
+                clean_content="order 4567 still hasn't shipped after two weeks",
+                language="en",
+                posted_at=now - timedelta(hours=20),
+                url="https://support.brand.com/tickets/4567",
+                extra_metadata={"channel": "email"},
+            ),
+        ]
+        session.add_all(feedback_items)
+        await session.flush()
+
+        insights = [
+            Insight(
+                feedback_id=feedback_items[0].id,
+                summary="Customers report severe battery drain within hours of use.",
+                sentiment_score=-0.75,
+                sentiment_label="negative",
+                urgency_level=5,
+                journey_stage="post_purchase",
+                pain_points={"hardware": "battery longevity"},
+            ),
+            Insight(
+                feedback_id=feedback_items[1].id,
+                summary="Positive feedback on the redesigned analytics dashboard UI.",
+                sentiment_score=0.65,
+                sentiment_label="positive",
+                urgency_level=1,
+                journey_stage="advocacy",
+                feature_requests={"dashboard": "dark mode toggle"},
+            ),
+            Insight(
+                feedback_id=feedback_items[2].id,
+                summary="Customers experience severe shipping delays beyond promised window.",
+                sentiment_score=-0.5,
+                sentiment_label="negative",
+                urgency_level=4,
+                journey_stage="onboarding",
+                customer_context={"order_id": "4567"},
+            ),
+        ]
+        session.add_all(insights)
+        await session.flush()
+
+        themes = [
+            Theme(name="Battery", description="Hardware battery issues", is_system=False),
+            Theme(name="Shipping", description="Fulfillment and logistics", is_system=False),
+            Theme(name="Product", description="Product experience", is_system=False),
+        ]
+        session.add_all(themes)
+        await session.flush()
+
+        theme_links = [
+            InsightThemeLink(insight_id=insights[0].id, theme_id=themes[0].id),
+            InsightThemeLink(insight_id=insights[0].id, theme_id=themes[2].id),
+            InsightThemeLink(insight_id=insights[1].id, theme_id=themes[2].id),
+            InsightThemeLink(insight_id=insights[2].id, theme_id=themes[1].id),
+        ]
+        session.add_all(theme_links)
+
+        alert_rule = AlertRule(
+            name="Negative Sentiment Spike",
+            rule_type="sentiment_threshold",
+            threshold_value=-0.5,
+            enabled=True,
+            channels={"webhook": True},
+        )
+        session.add(alert_rule)
+        await session.flush()
+
+        alert_event = AlertEvent(
+            alert_rule_id=alert_rule.id,
+            primary_insight_id=insights[0].id,
+            triggered_at=now - timedelta(hours=1),
+            severity="high",
+            status="open",
+            payload={
+                "sentiment_score": -0.75,
+                "insight_summary": insights[0].summary,
+            },
+        )
+        session.add(alert_event)
+
+        await session.commit()
+
+        console.print("[green]✓[/green] Demo data seeded successfully")
 
 
 @app.command()
@@ -122,13 +294,23 @@ async def _run_crawl(
                 data_source=data_source,
                 crawl_run=crawl_run,
                 outputs=outputs,
-                cleaning_options=CleaningOptions(min_characters=20),
+                cleaning_options=CleaningOptions(min_characters=10),
                 storage_options=StorageOptions(store_files=settings.is_dev),
             )
 
             console.print(f"[green]✓[/green] Stored {len(result.stored_feedback_ids)} records")
             console.print(f"[yellow]⊘[/yellow] Filtered {len(result.cleaning_summary.duplicates)} duplicates")
             console.print(f"[red]✗[/red] Discarded {len(result.cleaning_summary.discarded)} items")
+
+            if result.cleaning_summary.discarded:
+                discarded_rows = [
+                    (
+                        record.discard_reason or "unknown",
+                        len(record.cleaned_text),
+                    )
+                    for record in result.cleaning_summary.discarded
+                ]
+                console.print("[yellow]Discard reasons:[/yellow] " + str(discarded_rows))
 
             crawl_run.status = "completed"
             crawl_run.finished_at = datetime.utcnow()

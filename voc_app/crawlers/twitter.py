@@ -41,16 +41,51 @@ class TwitterCrawler(BaseCrawler):
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:
         schema = {
-            "tweet_url": "a[href*='/status/']::attr(href)",
-            "author_name": "div[data-testid='User-Name'] span:first-child",
-            "author_handle": "div[data-testid='User-Name'] span:nth-child(2)",
-            "timestamp": "time::attr(datetime)",
-            "content": "div[data-testid='tweetText']",
-            "metrics": {
-                "replies": "div[data-testid='reply'] span",
-                "retweets": "div[data-testid='retweet'] span",
-                "likes": "div[data-testid='like'] span",
-            },
+            "baseSelector": "article[data-testid='tweet']",
+            "fields": [
+                {
+                    "name": "tweet_url",
+                    "selector": "a[href*='/status/']",
+                    "type": "attribute",
+                    "attribute": "href",
+                },
+                {
+                    "name": "author_name",
+                    "selector": "div[data-testid='User-Name'] span:first-child",
+                    "type": "text",
+                },
+                {
+                    "name": "author_handle",
+                    "selector": "div[data-testid='User-Name'] span:nth-child(2)",
+                    "type": "text",
+                },
+                {
+                    "name": "timestamp",
+                    "selector": "time",
+                    "type": "attribute",
+                    "attribute": "datetime",
+                },
+                {
+                    "name": "content",
+                    "selector": "div[data-testid='tweetText']",
+                    "type": "text",
+                },
+                {
+                    "name": "replies",
+                    "selector": "div[data-testid='reply'] span",
+                    "type": "text",
+                },
+                {
+                    "name": "retweets",
+                    "selector": "div[data-testid='retweet'] span",
+                    "type": "text",
+                },
+                {
+                    "name": "likes",
+                    "selector": "div[data-testid='like'] span",
+                    "type": "text",
+                },
+            ],
         }
         extraction_strategy = JsonCssExtractionStrategy(schema)
         filters: dict[str, Any] = {}
@@ -58,8 +93,6 @@ class TwitterCrawler(BaseCrawler):
             filters["lang"] = self.language
 
         return {
-            "cache_mode": self.cache_mode,
-            "css_selector": "article[data-testid='tweet']",
             "extraction_strategy": extraction_strategy,
             "keep_data_attributes": True,
             "keep_attrs": ["data-testid", "href"],

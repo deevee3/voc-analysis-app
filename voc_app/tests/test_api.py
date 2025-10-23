@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -179,6 +180,74 @@ class TestDataSourceEndpoints:
 
         response = client.delete(f"/api/v1/sources/{source_id}")
         assert response.status_code == 204
+
+
+class TestCrawlEndpoints:
+    """Test crawl management endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_trigger_crawl_requires_valid_id(self, client):
+        """Triggering with invalid UUID should fail."""
+        response = client.post(
+            "/api/v1/crawls/trigger",
+            json={"data_source_id": "not-a-uuid"},
+        )
+        assert response.status_code == 400
+        assert "Invalid data_source_id" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_trigger_crawl_enqueue_task(self, client):
+        """Trigger crawl should enqueue Celery task with overrides merged."""
+        async with TestingSessionLocal() as session:
+            source = DataSource(
+                name="Trigger Source",
+                platform="reddit",
+                config={"subreddit": "testsub"},
+                is_active=True,
+            )
+            session.add(source)
+            await session.commit()
+            await session.refresh(source)
+            source_id = str(source.id)
+
+        with patch("voc_app.api.crawls.execute_crawl.delay") as mock_delay:
+            mock_delay.return_value.id = "task-123"
+
+            response = client.post(
+                "/api/v1/crawls/trigger",
+                json={
+                    "data_source_id": source_id,
+                    "query_override": {"query": "override-sub"},
+                },
+            )
+
+        assert response.status_code == 202
+        data = response.json()
+        assert data["task_id"] == "task-123"
+        mock_delay.assert_called_once_with(source_id, {"subreddit": "testsub", "query": "override-sub"})
+
+    @pytest.mark.asyncio
+    async def test_trigger_crawl_missing_reddit_config(self, client):
+        """Trigger crawl without subreddit should return validation error."""
+        async with TestingSessionLocal() as session:
+            source = DataSource(
+                name="Missing Config Source",
+                platform="reddit",
+                config={},
+                is_active=True,
+            )
+            session.add(source)
+            await session.commit()
+            await session.refresh(source)
+            source_id = str(source.id)
+
+        response = client.post(
+            "/api/v1/crawls/trigger",
+            json={"data_source_id": source_id},
+        )
+
+        assert response.status_code == 400
+        assert "Reddit sources require" in response.json()["detail"]
 
 
 class TestInsightEndpoints:

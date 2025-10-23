@@ -39,12 +39,12 @@ class CrawlTask(Task):
 
 
 @app.task(base=CrawlTask, bind=True)
-def execute_crawl(self, data_source_id: str, query: str | None = None) -> dict:
+def execute_crawl(self, data_source_id: str, config_override: dict[str, str] | None = None) -> dict:
     """Execute a single crawl for a data source."""
-    return asyncio.run(_execute_crawl_async(data_source_id, query))
+    return asyncio.run(_execute_crawl_async(data_source_id, config_override))
 
 
-async def _execute_crawl_async(data_source_id: str, query: str | None) -> dict:
+async def _execute_crawl_async(data_source_id: str, config_override: dict[str, str] | None) -> dict:
     """Async implementation of crawl execution."""
     async with _SessionFactory() as session:
         # Load data source
@@ -68,7 +68,11 @@ async def _execute_crawl_async(data_source_id: str, query: str | None) -> dict:
 
         try:
             # Execute platform-specific crawl
-            crawler = _get_crawler(data_source.platform, query or data_source.config)
+            crawler_config: dict[str, str] = dict(data_source.config or {})
+            if config_override:
+                crawler_config.update(config_override)
+
+            crawler = _get_crawler(data_source.platform, crawler_config)
             if not crawler:
                 raise ValueError(f"Unsupported platform: {data_source.platform}")
 
@@ -83,9 +87,36 @@ async def _execute_crawl_async(data_source_id: str, query: str | None) -> dict:
                 data_source=data_source,
                 crawl_run=crawl_run,
                 outputs=outputs,
-                cleaning_options=CleaningOptions(min_characters=20),
+                cleaning_options=CleaningOptions(min_characters=10),
                 storage_options=StorageOptions(store_files=True),
             )
+
+            summary = ingestion_result.cleaning_summary
+            if summary.records:
+                logger.info(
+                    "Stored records (%s): %s",
+                    len(summary.records),
+                    [
+                        {
+                            "id": record.identifier,
+                            "length": len(record.cleaned_text),
+                        }
+                        for record in summary.records
+                    ],
+                )
+            if summary.discarded:
+                logger.info(
+                    "Discarded records (%s): %s",
+                    len(summary.discarded),
+                    [
+                        {
+                            "id": record.identifier,
+                            "reason": record.discard_reason,
+                            "length": len(record.cleaned_text),
+                        }
+                        for record in summary.discarded
+                    ],
+                )
 
             # Update crawl run
             crawl_run.status = "completed"
@@ -105,6 +136,7 @@ async def _execute_crawl_async(data_source_id: str, query: str | None) -> dict:
             return {
                 "success": True,
                 "crawl_run_id": str(crawl_run.id),
+                "stored_feedback_ids": ingestion_result.stored_feedback_ids,
                 "stats": crawl_run.stats,
             }
 

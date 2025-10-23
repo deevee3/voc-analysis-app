@@ -63,7 +63,7 @@ class InsightExtractor:
     def __init__(
         self,
         *,
-        model: str = "gpt-4",
+        model: str = "gpt-5",
         max_retries: int = 3,
         batch_size: int = 5,
         rate_limit_delay: float = 1.0,
@@ -87,7 +87,7 @@ class InsightExtractor:
         prompt = format_single_extraction_prompt(
             content=feedback.clean_content or feedback.raw_content,
             source=str(feedback.data_source_id),
-            platform=feedback.metadata.get("platform", "unknown") if feedback.metadata else "unknown",
+            platform=feedback.extra_metadata.get("platform", "unknown") if feedback.extra_metadata else "unknown",
             posted_at=feedback.posted_at.isoformat() if feedback.posted_at else "unknown",
             url=feedback.url,
         )
@@ -191,8 +191,7 @@ class InsightExtractor:
             model=self.model,
             messages=messages,
             response_format={"type": "json_object"},
-            temperature=0.1,
-            max_tokens=2000,
+            max_completion_tokens=2000,
         )
 
         choice = response.choices[0]
@@ -223,7 +222,7 @@ class InsightExtractor:
 async def extract_insights(
     feedback_items: Sequence[Feedback],
     *,
-    model: str = "gpt-4",
+    model: str = "gpt-5",
     max_retries: int = 3,
     batch_size: int = 5,
 ) -> BatchExtractionSummary:

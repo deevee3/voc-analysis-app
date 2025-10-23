@@ -31,9 +31,9 @@ class InsightResponse(BaseModel):
     sentiment_score: float | None
     sentiment_label: str | None
     summary: str
-    pain_points: list[dict[str, Any]] | None
-    feature_requests: list[dict[str, Any]] | None
-    competitor_mentions: list[dict[str, Any]] | None
+    pain_points: list[dict[str, Any]] | dict[str, Any] | None
+    feature_requests: list[dict[str, Any]] | dict[str, Any] | None
+    competitor_mentions: list[dict[str, Any]] | dict[str, Any] | None
     customer_context: dict[str, Any] | None
     journey_stage: str | None
     urgency_level: int | None

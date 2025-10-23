@@ -99,6 +99,8 @@ class BaseCrawler(ABC):
         """Build the Crawl4AI run configuration for a target."""
 
         overrides = await self.build_run_config_overrides(target)
+        if "cache_mode" in overrides:
+            return CrawlerRunConfig(**overrides)
         return CrawlerRunConfig(cache_mode=self.cache_mode, **overrides)
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:

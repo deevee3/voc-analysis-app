@@ -41,19 +41,25 @@ class TrustpilotCrawler(BaseCrawler):
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:
         schema = {
-            "reviewer_name": "div[data-consumer-name-typography] span",
-            "review_title": "h2[data-service-review-title-typography]",
-            "review_text": "p[data-service-review-text-typography]",
-            "rating": "div[data-service-review-rating] img::attr(alt)",
-            "date": "time::attr(datetime)",
-            "verified": "div[data-service-review-verification-status]",
+            "baseSelector": "article.review",
+            "fields": [
+                {"name": "reviewer_name", "selector": "div[data-consumer-name-typography] span", "type": "text"},
+                {"name": "review_title", "selector": "h2[data-service-review-title-typography]", "type": "text"},
+                {"name": "review_text", "selector": "p[data-service-review-text-typography]", "type": "text"},
+                {
+                    "name": "rating",
+                    "selector": "div[data-service-review-rating] img",
+                    "type": "attribute",
+                    "attribute": "alt",
+                },
+                {"name": "date", "selector": "time", "type": "attribute", "attribute": "datetime"},
+                {"name": "verified", "selector": "div[data-service-review-verification-status]", "type": "text"},
+            ],
         }
 
         extraction_strategy = JsonCssExtractionStrategy(schema)
 
         return {
-            "cache_mode": self.cache_mode,
-            "css_selector": "article.review",
             "extraction_strategy": extraction_strategy,
             "keep_data_attributes": True,
         }

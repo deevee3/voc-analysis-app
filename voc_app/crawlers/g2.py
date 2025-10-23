@@ -40,15 +40,23 @@ class G2Crawler(BaseCrawler):
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:
         schema = {
-            "reviewer_name": "div.reviewer-info div.name",
-            "reviewer_title": "div.reviewer-info div.title",
-            "rating": "div.stars-container div.star::attr(class)",
-            "review_title": "h3.review-title",
-            "review_text": "div.review-text",
-            "pros": "div[itemprop='reviewBody'] div.pros",
-            "cons": "div[itemprop='reviewBody'] div.cons",
-            "date": "time::attr(datetime)",
-            "verified": "div.badge-verified",
+            "baseSelector": "div.paper.paper--white",
+            "fields": [
+                {"name": "reviewer_name", "selector": "div.reviewer-info div.name", "type": "text"},
+                {"name": "reviewer_title", "selector": "div.reviewer-info div.title", "type": "text"},
+                {
+                    "name": "rating",
+                    "selector": "div.stars-container div.star",
+                    "type": "attribute",
+                    "attribute": "class",
+                },
+                {"name": "review_title", "selector": "h3.review-title", "type": "text"},
+                {"name": "review_text", "selector": "div.review-text", "type": "text"},
+                {"name": "pros", "selector": "div[itemprop='reviewBody'] div.pros", "type": "text"},
+                {"name": "cons", "selector": "div[itemprop='reviewBody'] div.cons", "type": "text"},
+                {"name": "date", "selector": "time", "type": "attribute", "attribute": "datetime"},
+                {"name": "verified", "selector": "div.badge-verified", "type": "text"},
+            ],
         }
 
         extraction_strategy = JsonCssExtractionStrategy(schema)
@@ -64,8 +72,6 @@ class G2Crawler(BaseCrawler):
         """
 
         return {
-            "cache_mode": self.cache_mode,
-            "css_selector": "div.paper.paper--white",
             "extraction_strategy": extraction_strategy,
             "js_code": js_expand,
             "page_timeout": 60000,

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Final
 
 from dotenv import load_dotenv
+from sqlalchemy.engine import URL
 
 
 class AppEnvironment(str, Enum):
@@ -30,6 +31,35 @@ def _str_to_bool(value: str | None, default: bool) -> bool:
     return value.lower() in {"1", "true", "t", "yes", "y", "on"}
 
 
+def _build_oracle_async_url(
+    *,
+    username: str,
+    password: str,
+    dsn: str,
+    wallet_dir: str | None,
+    wallet_password: str | None,
+) -> str:
+    query: dict[str, str] = {"dsn": dsn}
+
+    if wallet_dir:
+        query["config_dir"] = wallet_dir
+        query.setdefault("wallet_location", wallet_dir)
+
+    if wallet_password:
+        query["wallet_password"] = wallet_password
+
+    url = URL.create(
+        drivername="oracle+oracledb_async",
+        username=username,
+        password=password,
+        host=None,
+        port=None,
+        database=None,
+        query=query,
+    )
+    return str(url)
+
+
 @dataclass(slots=True)
 class Settings:
     """Centralized configuration values loaded from environment variables."""
@@ -42,6 +72,11 @@ class Settings:
     openai_api_key: str | None
     alert_webhook_url: str | None
     redis_url: str
+    oracle_dsn: str | None
+    oracle_wallet_dir: str | None
+    oracle_wallet_password: str | None
+    oracle_username: str | None
+    oracle_password: str | None
 
     @property
     def is_dev(self) -> bool:
@@ -85,7 +120,15 @@ class Settings:
         }[env]
 
         debug = _str_to_bool(os.getenv("VOC_APP_DEBUG"), defaults["debug"])
-        database_url = os.getenv("VOC_APP_DATABASE_URL", defaults["database_url"])
+        oracle_username = os.getenv("VOC_APP_DB_USERNAME")
+        oracle_password = os.getenv("VOC_APP_DB_PASSWORD")
+        oracle_dsn = os.getenv("VOC_APP_ORACLE_DSN")
+        oracle_wallet_dir = os.getenv("VOC_APP_ORACLE_WALLET_DIR") or os.getenv("TNS_ADMIN")
+        oracle_wallet_password = os.getenv("VOC_APP_ORACLE_WALLET_PASSWORD")
+
+        database_url_env = os.getenv("VOC_APP_DATABASE_URL")
+        database_url = database_url_env or defaults["database_url"]
+
         crawl_concurrency = int(
             os.getenv("VOC_APP_CRAWL_CONCURRENCY", defaults["crawl_concurrency"])
         )
@@ -94,6 +137,15 @@ class Settings:
         )
 
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+        if not database_url_env and oracle_username and oracle_password and oracle_dsn:
+            database_url = _build_oracle_async_url(
+                username=oracle_username,
+                password=oracle_password,
+                dsn=oracle_dsn,
+                wallet_dir=oracle_wallet_dir,
+                wallet_password=oracle_wallet_password,
+            )
 
         return cls(
             env=env,
@@ -104,6 +156,11 @@ class Settings:
             openai_api_key=os.getenv("OPENAI_API_KEY"),
             alert_webhook_url=os.getenv("VOC_APP_ALERT_WEBHOOK_URL"),
             redis_url=redis_url,
+            oracle_dsn=oracle_dsn,
+            oracle_wallet_dir=oracle_wallet_dir,
+            oracle_wallet_password=oracle_wallet_password,
+            oracle_username=oracle_username,
+            oracle_password=oracle_password,
         )
 
 

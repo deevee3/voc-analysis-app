@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Iterable
+from urllib.parse import urljoin
 
 from crawl4ai import BrowserConfig, CacheMode, CrawlerRunConfig, JsonCssExtractionStrategy
 from crawl4ai.utils import optimize_html
@@ -38,49 +39,115 @@ class RedditCrawler(BaseCrawler):
         self.include_comments = include_comments
 
     def get_browser_config(self) -> BrowserConfig:
-        return BrowserConfig(headless=self.headless, java_script_enabled=True)
+        return BrowserConfig(
+            headless=self.headless,
+            java_script_enabled=True,
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        )
 
     async def build_run_config_overrides(self, target: CrawlTarget) -> dict[str, Any]:
         raw_schema = {
-            "title": "article h3",
-            "author": "a[href*='user']",
-            "permalink": "a[data-click-id='comments']::attr(href)",
-            "upvotes": "div[data-click-id='upvote']",
-            "content": "div[data-test-id='post-content']",
-            "posted": "a[data-click-id='timestamp']",
+            "baseSelector": "div.thing",
+            "fields": [
+                {"name": "title", "selector": "a.title", "type": "text"},
+                {"name": "author", "selector": "a.author", "type": "text"},
+                {
+                    "name": "permalink",
+                    "selector": "a.title",
+                    "type": "attribute",
+                    "attribute": "href",
+                },
+                {"name": "score", "selector": "div.score.unvoted", "type": "text"},
+                {"name": "num_comments", "selector": "a.comments", "type": "text"},
+                {"name": "subreddit", "selector": "a.subreddit", "type": "text"},
+                {"name": "domain", "selector": "span.domain a", "type": "text"},
+            ],
         }
         extraction_strategy = JsonCssExtractionStrategy(raw_schema)
         return {
-            "cache_mode": self.cache_mode,
-            "css_selector": "div[data-testid='post-container']",
             "extraction_strategy": extraction_strategy,
-            "keep_data_attributes": True,
-            "keep_attrs": ["href", "data-click-id"],
         }
 
     async def process_result(self, target: CrawlTarget, result) -> CrawlOutput:
-        cleaned_html = optimize_html(result.cleaned_html or result.html or "", threshold=50)
+        raw_html = result.cleaned_html or result.html or ""
+        optimized_html = optimize_html(raw_html, threshold=50) if raw_html else ""
         markdown = None
         if result.markdown:
             markdown_attr = getattr(result.markdown, "raw_markdown", None)
             markdown = markdown_attr if isinstance(markdown_attr, str) else str(result.markdown)
 
-        extracted_json = []
+        extracted_json: list[dict[str, Any]] = []
         if result.extracted_content:
             try:
                 extracted_json = json.loads(result.extracted_content)
             except (TypeError, json.JSONDecodeError):
                 extracted_json = []
 
+        posts: list[dict[str, Any]] = []
+        for item in extracted_json:
+            title = (item or {}).get("title")
+            if not title:
+                continue
+
+            permalink = item.get("permalink")
+            if permalink:
+                permalink = urljoin("https://www.reddit.com", permalink)
+
+            post_payload = {
+                "title": title.strip(),
+                "author": (item.get("author") or "").strip() or None,
+                "permalink": permalink,
+                "score": (item.get("score") or "").strip() or None,
+                "num_comments": (item.get("num_comments") or "").strip() or None,
+                "subreddit": (item.get("subreddit") or "").strip() or None,
+                "domain": (item.get("domain") or "").strip() or None,
+            }
+
+            posts.append({k: v for k, v in post_payload.items() if v})
+
+        if posts:
+            posts = posts[:50]
+
+        post_text_blocks: list[str] = []
+        for index, post in enumerate(posts, start=1):
+            lines = [f"Post #{index}: {post['title']}"]
+            if author := post.get("author"):
+                lines.append(f"Author: {author}")
+            if score := post.get("score"):
+                lines.append(f"Score: {score}")
+            if num_comments := post.get("num_comments"):
+                lines.append(f"Comments: {num_comments}")
+            if subreddit := post.get("subreddit"):
+                lines.append(f"Subreddit: {subreddit}")
+            if domain := post.get("domain"):
+                lines.append(f"Domain: {domain}")
+            if permalink := post.get("permalink"):
+                lines.append(f"URL: {permalink}")
+            post_text_blocks.append("\n".join(lines))
+
+        normalized_content = "\n\n".join(post_text_blocks).strip()
+        if not normalized_content:
+            normalized_content = optimized_html or raw_html
+
+        final_content = normalized_content or optimized_html or raw_html
+
         payload = {
             "subreddit": self.subreddit,
             "sort": self.sort,
             "time_filter": self.time_filter,
             "include_comments": self.include_comments,
-            "results": extracted_json,
+            "post_count": len(posts),
+            "results": posts,
         }
-        enriched_result = result.model_copy(update={"metadata": payload, "cleaned_html": cleaned_html})
-        return CrawlOutput(target=target, raw=enriched_result, cleaned_html=cleaned_html, markdown=markdown)
+        enriched_result = result.model_copy(
+            update={
+                "metadata": payload,
+                "cleaned_html": final_content,
+                "html": final_content,
+                "extracted_content": json.dumps(posts) if posts else None,
+            }
+        )
+        return CrawlOutput(target=target, raw=enriched_result, cleaned_html=final_content, markdown=markdown)
 
     @classmethod
     def build_targets_from_queries(
@@ -96,5 +163,5 @@ class RedditCrawler(BaseCrawler):
         ]
 
     def build_listing_target(self) -> CrawlTarget:
-        url = f"https://www.reddit.com/r/{self.subreddit}/{self.sort}/?t={self.time_filter}"
+        url = f"https://old.reddit.com/r/{self.subreddit}/{self.sort}/?t={self.time_filter}"
         return CrawlTarget(url=url, metadata={"subreddit": self.subreddit, "sort": self.sort})
